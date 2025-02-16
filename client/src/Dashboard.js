@@ -21,6 +21,7 @@ export default function Dashboard({ code }) {
   const [playlistCreated, setPlaylistCreated] = useState(false);
   const [playlists, setPlaylists] = useState([]);
   const [showPlaylists, setShowPlaylists] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
 
   function chooseTrack(track) {
     setPlayingTrack(track);
@@ -84,6 +85,31 @@ export default function Dashboard({ code }) {
       .catch((err) => {
         console.error("Error adding track to playlist:", err);
       });
+  }
+
+  useEffect(() => {
+    function handleBeforeInstallPrompt(event) {
+      event.preventDefault();
+      setDeferredPrompt(event);
+    }
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  function installApp() {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then((choiceResult) => {
+        if (choiceResult.outcome === "accepted") {
+          console.log("PWA Installed");
+        }
+        setDeferredPrompt(null);
+      });
+    }
   }
 
   useEffect(() => {
@@ -162,6 +188,15 @@ export default function Dashboard({ code }) {
         className="mb-4 p-2 w-full rounded bg-gray-800 text-white"
       />
 
+      {deferredPrompt && (
+        <button
+          onClick={installApp}
+          className="mt-4 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+        >
+          Install App
+        </button>
+      )}
+
       <div className="mb-6">
         <div className="max-w-md mx-auto">
           <input
@@ -178,9 +213,7 @@ export default function Dashboard({ code }) {
             onClick={handleCreatePlaylist}
             disabled={!playlistName}
             className={`mt-2 w-full p-2 rounded ${
-              playlistName
-                ? "bg-blue-500 hover:bg-blue-600"
-                : "bg-gray-600 cursor-not-allowed"
+              playlistName ? "bg-blue-500 hover:bg-blue-600" : "bg-gray-600 cursor-not-allowed"
             }`}
           >
             Create Playlist
@@ -198,25 +231,14 @@ export default function Dashboard({ code }) {
           <Playlists playlists={playlists} addTrackToPlaylist={addTrackToPlaylist} />
         ) : searchResults.length > 0 ? (
           searchResults.map((track) => (
-            <TrackSearchResult
-              track={track}
-              key={track.uri}
-              chooseTrack={chooseTrack}
-            />
+            <TrackSearchResult track={track} key={track.uri} chooseTrack={chooseTrack} />
           ))
         ) : (
           <div className="text-center whitespace-pre">{lyrics}</div>
         )}
       </div>
 
-      <div
-        className="flex justify-center items-center bg-gray-800 p-4 rounded shadow-md"
-        style={{
-          width: "100%",
-          maxWidth: "800px", 
-          margin: "0 auto", 
-        }}
-      >
+      <div className="flex justify-center items-center bg-gray-800 p-4 rounded shadow-md">
         <Player accessToken={accessToken} trackUri={playingTrack?.uri} />
         {playingTrack && (
           <button
